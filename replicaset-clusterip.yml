@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-testing-clusterip
+spec:
+# replicas: 2
+  replicas: 4
+  selector:
+    matchLabels:
+      app: nginx
+      environment: testing-clusterip
+  template:
+    metadata:
+      labels:
+        app: nginx
+        environment: testing-clusterip
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
