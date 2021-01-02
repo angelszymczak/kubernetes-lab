@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-testing-external-name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+      environment: testing-external-name
+  template:
+    metadata:
+      labels:
+        app: nginx
+        environment: testing-external-name
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+
