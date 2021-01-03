@@ -30,7 +30,7 @@ kubectl create secret generic credentials --from-file=./username --from-file=./p
 echo MTIzNDVhYmNkZWY= | base64 -d
 # 12345abcdef
 
-kubectl apply -f secret-credentials.yml 
+kubectl apply -f secret-credentials.yml
 # secret/credentials-manifest created
 
 kubectl get secrets
@@ -96,7 +96,7 @@ kubectl get secret credentials-manifest -oyaml | grep password
 #        f:password: {}
 
 echo MTIzNTZhYmNkIAo= | base64 -d
-# 12356abcd 
+# 12356abcd
 
 kubectl get secrets
 # NAME                   TYPE                                  DATA   AGE
@@ -130,3 +130,109 @@ kubectl exec nginx-secrets-mount -- cat /etc/secrets/username
 
 kubectl exec nginx-secrets-mount -- cat /etc/secrets/password
 # 12356abcd 
+
+# We can select and import different secrets, for example the password
+kubectl apply -f pod-secret-mount-item.yml
+
+kubectl get pods
+# NAME                       READY   STATUS    RESTARTS   AGE
+# nginx-cm                   1/1     Running   0          96m
+# nginx-secrets-mount        1/1     Running   0          34m
+# nginx-secrets-mount-item   1/1     Running   0          5m19s
+
+kubectl exec nginx-secrets-mount-item -- cat /etc/secrets/password
+# 12356abcd
+
+# if we try to modify the content of pod-secret at now, it will fail,
+kubectl apply -f pod-secret-mount-item.yml
+# The Pod "nginx-secrets-mount-item" is invalid: spec: Forbidden: pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)
+#   core.PodSpec{
+#   	Volumes: []core.Volume{
+#   		{
+#   			Name: "secrets",
+#   			VolumeSource: core.VolumeSource{
+#   				... // 3 identical fields
+#   				AWSElasticBlockStore: nil,
+#   				GitRepo:              nil,
+#   				Secret: &core.SecretVolumeSource{
+#   					SecretName: "credentials-manifest",
+#   					Items: []core.KeyToPath{
+#   						{
+# - 							Key:  "username",
+# + 							Key:  "password",
+# - 							Path: "username",
+# + 							Path: "password",
+#   							Mode: &500,
+#   						},
+#   					},
+#   					DefaultMode: &420,
+#   					Optional:    nil,
+#   				},
+#   				NFS:   nil,
+#   				ISCSI: nil,
+#   				... // 21 identical fields
+#   			},
+#   		},
+#   		{Name: "default-token-cdk2f", VolumeSource: {Secret: &{SecretName: "default-token-cdk2f", DefaultMode: &420}}},
+#   	},
+#   	InitContainers: nil,
+#   	Containers:     {{Name: "nginx", Image: "nginx:1.7.9", VolumeMounts: {{Name: "secrets", ReadOnly: true, MountPath: "/etc/secrets"}, {Name: "default-token-cdk2f", ReadOnly: true, MountPath: "/var/run/secrets/kubernetes.io/serviceaccount"}}, TerminationMessagePath: "/dev/termination-log", ...}},
+#   	... // 27 identical fields
+#   }
+
+# because it is an inmutable resource we can't modify with a running pod
+# So, we need to delete and create again
+kubectl get pods
+# NAME                       READY   STATUS    RESTARTS   AGE
+# nginx-cm                   1/1     Running   0          96m
+# nginx-secrets-mount        1/1     Running   0          34m
+# nginx-secrets-mount-item   1/1     Running   0          5m19s
+
+kubectl delete -f pod-secret-mount-item.yml
+# pod "nginx-secrets-mount-item" deleted
+
+kubectl apply -f pod-secret-mount-item.yml
+# pod/nginx-secrets-mount-item created
+
+# Notice that we no longer have the password variable
+kubectl exec nginx-secrets-mount-item -- ls /etc/secrets
+# username
+
+kubectl exec nginx-secrets-mount-item -- cat /etc/secrets/username
+# admin
+
+# Now we will edit this secrets and that applies on real time
+export EDITOR=nvim
+kubectl get secrets
+# NAME                   TYPE                                  DATA   AGE
+# credentials            Opaque                                2      61m
+# credentials-manifest   Opaque                                2      57m
+# default-token-cdk2f    kubernetes.io/service-account-token   3      2d9h
+
+# It will open the editor
+# on inside we update the username value with new
+echo superAdmin | base64
+# c3VwZXJBZG1pbgo=
+
+kubectl edit secrets credentials-manifest
+# secret/credentials-manifest edited
+
+# Change don't apply for ConfigMaps, because they were read on build time,
+# so we need delete and create the pod again
+# When you outcome from editor the changes will be applied automatically between om 30"-60"
+kubectl exec nginx-secrets-mount-item -- cat /etc/secrets/username
+# superAdmin
+
+# Now, we try to do it from environmen variables
+kubectl describe secret credentials-manifest
+# Name:         credentials-manifest
+# Namespace:    default
+# Labels:       <none>
+# Annotations:  <none>
+#
+# Type:  Opaque
+#
+# Data
+# ====
+# password:  11 bytes
+# username:  11 bytes
