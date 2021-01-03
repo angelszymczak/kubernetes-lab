@@ -236,3 +236,19 @@ kubectl describe secret credentials-manifest
 # ====
 # password:  11 bytes
 # username:  11 bytes
+
+# Now we will source this items like container env var
+
+kubectl apply -f pod-secret-mount-item-envvar.yml
+# pod/nginx-secrets-mount-item-envvar created
+
+kubectl get pods
+# NAME                              READY   STATUS    RESTARTS   AGE
+# nginx-cm                          1/1     Running   0          133m
+# nginx-secrets-mount               1/1     Running   0          71m
+# nginx-secrets-mount-item          1/1     Running   0          32m
+# nginx-secrets-mount-item-envvar   1/1     Running   0          53s
+
+kubectl exec nginx-secrets-mount-item-envvar -- env | grep SECRET_
+# SECRET_USERNAME=superAdmin
+# SECRET_PASSWORD=12345abcdef
