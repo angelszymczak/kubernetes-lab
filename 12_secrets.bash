@@ -107,3 +107,26 @@ kubectl get secrets
 
 # Ok, we have created a credentials object with an username and password source by files that
 # we can source with username and password files, and then will be encoded to base64
+
+# The next step is create pod that can source from this credentials secret kind resource.
+# The Pod will mount the secret resource on /etc/secrets as volume on read only mode.
+
+kubectl apply -f pod-secrets.yml
+# pod/nginx-secrets-mount created
+
+kubectl get pods
+# NAME                  READY   STATUS    RESTARTS   AGE
+# nginx-cm              1/1     Running   0          62m
+# nginx-secrets-mount   1/1     Running   0          10s
+
+kubectl exec nginx-secrets-mount -- ls /etc/secrets
+# password
+# username
+
+# On this way the apps can access the credentials
+
+kubectl exec nginx-secrets-mount -- cat /etc/secrets/username
+# admin
+
+kubectl exec nginx-secrets-mount -- cat /etc/secrets/password
+# 12356abcd 
