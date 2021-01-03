@@ -252,3 +252,88 @@ kubectl get pods
 kubectl exec nginx-secrets-mount-item-envvar -- env | grep SECRET_
 # SECRET_USERNAME=superAdmin
 # SECRET_PASSWORD=12345abcdef
+
+# At this point we solved use cases for api keys storage, usernames and passwords,
+# but at now will try to ssh for example if your pod should connect to repository.
+
+ssh-keygen -f id_rsa
+# Generating public/private rsa key pair.
+# ...
+
+# We will store this keys on secrets
+# A good strategy is use it from files/directory
+kubectl create secret generic ssh-key-secret --from-file=./id_rsa --from-file=./id_rsa.pub
+# secret/ssh-key-secret created
+
+kubectl describe secret ssh-key-secret
+# Name:         ssh-key-secret
+# Namespace:    default
+# Labels:       <none>
+# Annotations:  <none>
+#
+# Type:  Opaque
+#
+# Data
+# ====
+# id_rsa:      1675 bytes
+# id_rsa.pub:  393 bytes
+
+# Get Manifest
+kubectl get secret ssh-key-secret -o yaml
+# apiVersion: v1
+# data:
+#   id_rsa: LS0tLS ... ==
+#   id_rsa.pub: c3NoL ... WEK
+# kind: Secret
+# metadata:
+#   creationTimestamp: "2021-01-03T17:21:01Z"
+#   managedFields:
+#   - apiVersion: v1
+#     fieldsType: FieldsV1
+#     fieldsV1:
+#       f:data:
+#         .: {}
+#         f:id_rsa: {}
+#         f:id_rsa.pub: {}
+#       f:type: {}
+#     manager: kubectl-create
+#     operation: Update
+#     time: "2021-01-03T17:21:01Z"
+#   name: ssh-key-secret
+#   namespace: default
+#   resourceVersion: "51455"
+#   uid: b7695a22-3520-42db-9690-9402da64655e
+# type: Opaque
+
+# Remember that public and private keys are based on 64, also we don't need to set the public ip, with private key is enough.
+# to generate a public key.
+# We will create a pod with Env Vars mounted from credential-manifest secret, and ssh key from ssh-key-secret secret.
+kubectl get secret
+# NAME                   TYPE                                  DATA   AGE
+# credentials            Opaque                                2      14h
+# credentials-manifest   Opaque                                2      14h
+# default-token-cdk2f    kubernetes.io/service-account-token   3      2d23h
+# ssh-key-secret         Opaque                                2      12m
+
+kubectl apply -f pod-secret-mount-item-envvar-w-ssh.yml
+# pod/nginx-secrets-mount-item-envvar-w-ssh created
+
+kubectl get pod
+# NAME                                    READY   STATUS    RESTARTS   AGE
+# nginx-cm                                1/1     Running   1          15h
+# nginx-secrets-mount                     1/1     Running   1          14h
+# nginx-secrets-mount-item                1/1     Running   1          13h
+# nginx-secrets-mount-item-envvar         1/1     Running   1          13h
+# nginx-secrets-mount-item-envvar-w-ssh   1/1     Running   0          14s
+
+kubectl exec nginx-secrets-mount-item-envvar-w-ssh -- ls /root/.ssh
+# id_rsa
+# id_rsa.pub
+
+kubectl exec nginx-secrets-mount-item-envvar-w-ssh -- cat /root/.ssh/id_rsa.pub
+# ssh-rsa AAAAB3 ... angel@freya
+
+kubectl exec nginx-secrets-mount-item-envvar-w-ssh -- env | grep SECRET_
+SECRET_USERNAME=superAdmin
+SECRET_PASSWORD=12345abcdef
+
